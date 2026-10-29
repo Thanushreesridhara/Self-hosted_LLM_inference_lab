@@ -19,6 +19,9 @@ spec:
         app: vllm
     spec:
       runtimeClassName: nvidia
+      # The Service is named "vllm", so service links would inject VLLM_PORT=tcp://...,
+      # which collides with vLLM's own VLLM_PORT setting.
+      enableServiceLinks: false
       containers:
         - name: vllm
           image: vllm/vllm-openai@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34
