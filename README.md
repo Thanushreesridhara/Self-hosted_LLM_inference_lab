@@ -241,9 +241,10 @@ This lab is a single-user, single-node sketch; it does **not** implement any of 
 
 - **Federation:** multiple clusters (possibly across institutions) behind a common control plane and model catalogue, with placement that respects data-residency rules; this needs cluster-API/GitOps tooling and cross-cluster identity, none of which is here.
 - **Tenant isolation:** namespaces with ResourceQuota (used here, for one namespace) are the starting point; real isolation also needs NetworkPolicies, RBAC per tenant, separate or MIG/vGPU-partitioned GPUs (time-slicing does not isolate GPU memory), per-tenant storage and secrets.
-- **Quotas and fair use:** per-tenant GPU/token budgets, admission control and queueing, plus scale-to-zero and weight caching to use scarce GPUs efficiently (the PVC cache here is a minimal version of that idea; the effect was not measured).
+- **Quotas and fair use:** per-tenant GPU/token budgets, admission control and queueing, plus scale-to-zero and weight caching to use scarce GPUs efficiently (the PVC cache here is a minimal version of that idea; its effect was measured only as warm-start vs a slow Docker download, and scale-to-zero here is manual).
 - **Authentication and authorisation:** an API gateway with OIDC/institutional SSO, per-tenant API keys and audit logs in front of the inference endpoints (vLLM is unauthenticated here).
 - **Multi-tenant observability:** per-tenant metric and log separation (for example tenant-labelled series and per-tenant dashboards/access control in the observability backend), retention and data-sovereignty controls. Here there is one Prometheus and one Grafana dashboard.
+- **LLM/MCP-based operations analysis:** the MCP server here is read-only with fixed queries and an audit log, which is the safe shape for this, but it has no authentication or tenant scoping and the 7B model's analysis was unreliable in the one run I did.
 - **Bring-your-own-model:** a vetted path for tenants to deploy their own weights (image scanning, size limits, resource profiles).
 
 ## License
