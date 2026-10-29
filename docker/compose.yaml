@@ -1,0 +1,52 @@
+name: self-hosted-llm-lab
+
+services:
+  ollama:
+    image: ollama/ollama@sha256:b2f0122c476bc9fe7ce679d8bb4bd555351e25e2554eefb156f61cb0a89cf429
+    container_name: llm-lab-ollama
+    profiles: [ollama]
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  vllm:
+    image: vllm/vllm-openai@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34
+    container_name: llm-lab-vllm
+    profiles: [vllm]
+    ports:
+      - "8000:8000"
+    volumes:
+      - huggingface-cache:/root/.cache/huggingface
+    shm_size: 8gb
+    command:
+      - --model
+      - Qwen/Qwen2.5-7B-Instruct-AWQ
+      - --served-model-name
+      - qwen2.5-7b-awq
+      - --quantization
+      - awq
+      - --max-model-len
+      - "4096"
+      - --gpu-memory-utilization
+      - "0.80"
+      - --max-num-seqs
+      - "8"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  ollama-models:
+  huggingface-cache:
