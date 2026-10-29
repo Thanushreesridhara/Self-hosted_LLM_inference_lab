@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install -r benchmark/requirements.txt yamllint
+
+      - name: yamllint
+        run: yamllint .
+
+      - name: pytest
+        run: python -m pytest -q benchmark/tests
+
+      - uses: azure/setup-helm@v5.0.1
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz \
+            | tar -xz -C /usr/local/bin kubeconform
+
+      - name: kubeconform (plain manifests)
+        run: |
+          kubeconform -strict -summary -ignore-missing-schemas \
+            k8s/vllm k8s/tests k8s/monitoring/vllm-servicemonitor.yaml \
+            k8s/monitoring/dashboard-configmap.yaml
+
+      - name: Render and validate Helm releases with repo values
+        run: make helm-validate
