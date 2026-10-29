@@ -125,3 +125,11 @@ Times are local to the WSL2 environment (`2026-10-29`, Europe/London).
 - TTFT p50 0.016 / 0.021 / 0.028 / 0.035 s and e2e p50 0.45-0.47 s at concurrency 1/2/4/8; per-request tokens/s p50 146.5-149.7.
 - Peak VRAM 13,486-13,488 MiB (whole GPU; vLLM pre-allocates per --gpu-memory-utilization, so this reflects the setting, not model need).
 - Not apples-to-apples: GGUF Q4_K_M (llama.cpp backend) vs AWQ 4-bit (Marlin kernels); different runtimes, and max_tokens 64 only.
+
+## 2026-10-29 — Phase 2 step 1: k3s + GPU in Kubernetes
+
+- Host setup was run by the user (sudo cannot be entered in the tool session) via `scripts/setup-k3s-wsl.sh`, which follows the NVIDIA Container Toolkit and k3s NVIDIA-runtime docs. Toolkit installed before k3s so k3s detects the runtime at start.
+- Versions observed: k3s v1.36.5+k3s1 (containerd 2.3.4-k3s1.36), NVIDIA Container Toolkit CLI 1.20.1, Helm v3.22.1. Single node `gurukarthik`, Ready; `nvidia` RuntimeClass present.
+- Device plugin: the plugin docs page showed chart 0.17.1, but `helm search repo` listed 0.20.1 as latest; installed `nvdp/nvidia-device-plugin` 0.20.1 in namespace `nvidia-device-plugin` with `--set runtimeClassName=nvidia`.
+- Problem: the DaemonSet scheduled 0 pods, because its node affinity requires NFD/GFD labels (`feature.node.kubernetes.io/pci-10de.present`, etc.) and this cluster has no NFD. Fix: manually labelled the node `nvidia.com/gpu.present=true`. The plugin then started, logged "Detected platform: wsl", registered `nvidia.com/gpu`, and the node reported allocatable `nvidia.com/gpu: 1`.
+- Verification: `k8s/tests/gpu-smoke.yaml` (runtimeClassName nvidia, limit nvidia.com/gpu: 1) ran `nvidia-smi` and listed the RTX 5070 Ti, 16,303 MiB, driver 610.57.01. Pod deleted afterwards.
