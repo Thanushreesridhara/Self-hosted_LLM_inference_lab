@@ -62,7 +62,7 @@ flowchart LR
 | NVIDIA driver | KMD 610.88 (`nvidia-smi` 610.57.01), CUDA UMD 13.3 |
 | Docker | Docker Desktop 4.84.0, Engine 29.6.2 |
 | Ollama | 0.40.13 (`ollama/ollama@sha256:b2f0122c...`), model `qwen2.5:7b-instruct-q4_K_M` (GGUF Q4_K_M, 4.7 GB) |
-| vLLM | 0.32.0 (`vllm/vllm-openai@sha256:befccf0e...`), model `Qwen/Qwen2.5-7B-Instruct-AWQ`, `--max-model-len 4096 --gpu-memory-utilization 0.80 --max-num-seqs 8` |
+| vLLM | 0.32.0 (`vllm/vllm-openai@sha256:befccf0e...`), model `Qwen/Qwen2.5-7B-Instruct-AWQ`, `--max-model-len 4096 --gpu-memory-utilization 0.80 --max-num-seqs 8` (the k3s Deployment later gained `--enable-auto-tool-choice --tool-call-parser=hermes` for the MCP demo, after the in-cluster benchmark) |
 | Kubernetes | k3s v1.36.5+k3s1, containerd 2.3.4-k3s1.36, single node |
 | NVIDIA stack | Container Toolkit 1.20.1, k8s-device-plugin chart 0.20.1 |
 | Monitoring | kube-prometheus-stack chart 92.15.0, dcgm-exporter chart 4.8.4 (image tag 4.6.1-4.8.4-distroless), Helm v3.22.1 |
@@ -77,7 +77,7 @@ flowchart LR
 - **End-to-end latency** p50 (median) and p95 (nearest-rank) over successful requests; failures are counted separately (failure rate).
 - **Peak VRAM**: maximum `nvidia-smi` memory use over the whole GPU while the level ran.
 
-Only one engine used the GPU at a time. Each configuration was run **once**.
+Only one engine used the GPU at a time, except in the deliberate time-slicing experiment below. Each configuration was run **once**.
 
 ## Results
 
@@ -161,7 +161,7 @@ The NVIDIA device plugin was reconfigured to advertise the one GPU as 2 `nvidia.
 
 [`mcp/server.py`](mcp/server.py) is a small MCP server (official Python SDK 2.3.0, stdio) exposing 8 read-only tools backed by **fixed** Prometheus queries: p95 latency, p95 time to first token, error rate, GPU utilisation / memory / temperature, queue state (running, waiting, KV-cache usage) and scrape status. No tool takes PromQL or free text; the only parameter is an integer look-back window (1 to 60 min). The server makes HTTP GETs to Prometheus's query API and nothing else (no shell, no file access, no writes), and appends every call to a JSONL log. [`mcp/agent.py`](mcp/agent.py) connects to the server as an MCP client, offers those tools to the vLLM-served Qwen2.5 model (vLLM started with `--enable-auto-tool-choice --tool-call-parser=hermes`), and asks "Is the inference service healthy, and why might it be slow?".
 
-One run against the live cluster during a benchmark load ([transcript](results/mcp/agent_transcript_20261029.txt), [tool-call log](results/mcp/tool_calls_20261029.jsonl)): the model made 5 tool calls (scrape status, p95 latency 0.492 s, p95 TTFT 0.049 s, error rate 0, queue state 0 running / 0 waiting) and answered that the service looked healthy.
+One run against the live cluster during a benchmark load ([transcript](results/mcp/agent_transcript_20261029.txt), [tool-call log](results/mcp/tool_calls_20261029.jsonl)): the model made 5 tool calls (scrape status, p95 latency 0.492 s, p95 TTFT 0.049 s, error rate 0, queue state 0 running / 0 waiting; 7 Prometheus queries were logged because queue state issues three) and answered that the service looked healthy.
 
 What this does and does not show:
 - The plumbing works end to end: tool discovery, model-issued tool calls, results fed back, a logged audit trail, and 7 unit tests for the query/parsing/validation code (`mcp/tests`, run in CI).
@@ -191,9 +191,16 @@ make k8s-gpu-plugin k8s-vllm k8s-monitoring k8s-dashboard
 make bench-k8s
 make grafana-password             # then: kubectl -n monitoring port-forward svc/kps-grafana 3000:80
 
+# MCP demo (needs a Python env with mcp/requirements.txt; vLLM and Prometheus port-forwarded)
+kubectl -n llm-inference port-forward svc/vllm 8001:8000 &
+kubectl -n monitoring port-forward svc/kps-kube-prometheus-stack-prometheus 9090:9090 &
+python mcp/agent.py --llm-url http://localhost:8001/v1 --model qwen2.5-7b-awq --prometheus-url http://localhost:9090
+
 # Checks (also run in CI)
 make test lint helm-validate
 ```
+
+The time-slicing experiment (`k8s/sharing/`) and the start-up timings (`scripts/measure-*.sh`) are run by hand and are not Makefile targets; see `LOG.md` for the exact steps.
 
 Note: the Makefile targets were written from the commands I ran by hand; I could not run `make` itself on my machine (it is not installed there), although CI runs `make helm-validate`.
 
@@ -204,7 +211,9 @@ Note: the Makefile targets were written from the commands I ran by hand; I could
 - **The device plugin did not schedule on this node** until I added the `nvidia.com/gpu.present=true` label, because it relies on Node Feature Discovery labels that this cluster lacks.
 - **A Service named `vllm` injects `VLLM_*` environment variables** that collide with vLLM's own settings; `enableServiceLinks: false` avoids that.
 - **Prometheus silently drops a ServiceMonitor whose `scrapeTimeout` exceeds its interval.** The DCGM chart default (25 s) did exactly that; the operator log, not Prometheus, told me.
-- **Model downloads from pods failed** here (see below), so weights had to be pre-loaded into the PVC.
+- **Model downloads from pods failed** here ([details](docs/pod-network-download-issue.md)), so weights had to be pre-loaded into the PVC.
+- **vLLM counts other processes' GPU memory against its own budget**, so a second instance on a shared GPU needs `--kv-cache-memory-bytes` instead of `--gpu-memory-utilization`.
+- **Be careful with `kubectl delete` without `-n`:** a stray crash-looping pod kept loading weights on the GPU and invalidated a baseline until I noticed the odd `nvidia-smi` reading.
 - DCGM exporter works on WSL2 with this GPU, which I had not expected.
 
 ## Limitations
@@ -218,7 +227,7 @@ Note: the Makefile targets were written from the commands I ran by hand; I could
 
 ## What I did not do
 
-- **Stretch goal D** (MCP server with tool calling) is not described here yet. Goal A (cache) was measured only in Docker, and goal B (scale-to-zero) only by manual `kubectl scale`, without KEDA or Knative.
+- The stretch goals were done only in the limited forms described above: the cold-cache measurement exists only for Docker (one run), scale-to-zero was manual `kubectl scale` without KEDA or Knative, GPU sharing used time-slicing only (no MIG or other isolation), and the MCP agent was run once.
 - I did not diagnose why pods could not download from Hugging Face ([`docs/pod-network-download-issue.md`](docs/pod-network-download-issue.md)). The weights were copied from the Docker volume into the PVC and vLLM runs with `HF_HUB_OFFLINE=1`, so a network cold start in the cluster was never measured.
 - I did not investigate Ollama's concurrency behaviour or tune it.
 - I did not compare the same quantisation format across engines, or measure output quality.
