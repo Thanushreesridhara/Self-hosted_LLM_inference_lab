@@ -33,14 +33,18 @@ flowchart LR
       end
       subgraph k3s["Phase 2: single-node k3s"]
         subgraph nsi["ns: llm-inference (ResourceQuota)"]
-          V2["vLLM Deployment"] --- SVC["Service :8000"]
+          V2["vLLM Deployment<br/>tool calling enabled"] --- SVC["Service :8000"]
           V2 --- PVC[("PVC hf-cache")]
+          VAB["Stretch C only: vLLM A + B<br/>time-sliced, 1 GPU as 2 units"]
         end
         subgraph nsm["ns: monitoring"]
           PR["Prometheus"] --> GF["Grafana<br/>dashboard from ConfigMap"]
           DC["DCGM exporter"]
         end
         PLUG["NVIDIA device plugin"]
+      end
+      subgraph mcpbox["Stretch D: MCP (local processes)"]
+        AG["mcp/agent.py<br/>MCP client + tool-calling loop"] -->|stdio| MS["mcp/server.py<br/>8 read-only tools, call log"]
       end
     end
   end
@@ -50,6 +54,9 @@ flowchart LR
   PR -->|"/metrics via ServiceMonitor"| V2
   PR -->|"GPU metrics"| DC
   PLUG -.->|nvidia.com/gpu| V2
+  PLUG -.->|"2 x nvidia.com/gpu"| VAB
+  MS -->|"fixed PromQL, HTTP GET"| PR
+  AG -->|"chat + tools"| SVC
 ```
 
 ## Environment (as observed)
