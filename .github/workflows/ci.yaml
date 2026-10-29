@@ -19,13 +19,15 @@ jobs:
           python-version: "3.12"
 
       - name: Install Python dependencies
-        run: pip install -r benchmark/requirements.txt yamllint
+        run: pip install -r benchmark/requirements.txt -r mcp/requirements.txt yamllint
 
       - name: yamllint
         run: yamllint .
 
       - name: pytest
-        run: python -m pytest -q benchmark/tests
+        run: |
+          python -m pytest -q benchmark/tests
+          python -m pytest -q mcp/tests
 
       - uses: azure/setup-helm@v5.0.1
 
