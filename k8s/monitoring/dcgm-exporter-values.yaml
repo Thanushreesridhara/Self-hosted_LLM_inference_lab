@@ -2,3 +2,5 @@ runtimeClassName: nvidia
 serviceMonitor:
   enabled: true
   interval: 15s
+  # Chart default (25s) exceeds the interval, which Prometheus rejects.
+  scrapeTimeout: 10s
