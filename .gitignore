@@ -25,3 +25,5 @@ models/
 .DS_Store
 Thumbs.db
 .chart-lint/
+logs/
+.venv-mcp/

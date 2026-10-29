@@ -136,6 +136,25 @@ The empty-cache figure is almost entirely download time (5.2 GB), so it mostly m
 - I did not try KEDA or Knative, so there is no request-driven scale-from-zero here: the scaling was done by hand with `kubectl scale`.
 - The empty-cache case could only be measured in Docker, because pods in this cluster could not download weights (see [`docs/pod-network-download-issue.md`](docs/pod-network-download-issue.md)). An in-cluster empty-cache number does not exist.
 
+### GPU sharing with time-slicing
+
+The NVIDIA device plugin was reconfigured to advertise the one GPU as 2 `nvidia.com/gpu` units ([`k8s/sharing/`](k8s/sharing/)), and two vLLM pods (A and B, same model) were scheduled onto it. Raw data: [`results/sharing/`](results/sharing/).
+
+| Setup | Concurrency | OK | TTFT p50 | Tok/s p50 | E2E p50 | E2E p95 |
+|---|---|---|---|---|---|---|
+| Pod A alone | 1 | 16/16 | 0.013 | 153.1 | 0.431 | 0.436 |
+| Pod A alone | 4 | 16/16 | 0.024 | 155.9 | 0.434 | 0.437 |
+| Pod A, with B also under load | 1 | 48/48 | 0.022 | 71.7 | 0.912 | 0.942 |
+| Pod A, with B also under load | 4 | 48/48 | 0.049 | 72.8 | 0.928 | 0.938 |
+| Pod B, with A also under load | 1 | 48/48 | 0.022 | 71.5 | 0.918 | 0.935 |
+| Pod B, with A also under load | 4 | 48/48 | 0.051 | 71.2 | 0.946 | 0.975 |
+
+- With both pods busy, each pod's per-request speed roughly halved (about 153 to about 72 tokens/s at concurrency 1) and end-to-end latency roughly doubled (0.43 s to about 0.91 s). That is what you would expect if the GPU's compute time is split between the two; I did not profile the scheduler to confirm the mechanism.
+- Caveats: the A-alone baseline used 16 requests per level, the shared runs used 48; A and B were benchmarked concurrently but not synchronised, so the two pods' concurrency levels did not always line up in time; one run each.
+- **Time-slicing does not isolate memory.** From inside either pod, `nvidia-smi` showed the full 16,303 MiB GPU and the combined 14,638 MiB in use. Nothing limits one pod's memory use, so a misbehaving pod could exhaust memory for both. Time-slicing also does not guarantee a fair compute share.
+- Two vLLM instances could not be started with `--gpu-memory-utilization`: vLLM 0.32.0 counted the first pod's GPU memory against the second pod's budget and computed a negative KV-cache size (-6.15 GiB). Both pods therefore use a fixed `--kv-cache-memory-bytes=1073741824` (1 GiB). A first attempt at a 0.42 fraction also failed (too little KV cache for a 4,096-token sequence).
+- The plugin and quota were reverted to the single-GPU configuration after the experiment.
+
 ### Monitoring
 
 Prometheus scrapes vLLM's `/metrics` (a ServiceMonitor) and the DCGM exporter. The dashboard ([`dashboards/llm-inference.json`](dashboards/llm-inference.json)) has panels for e2e latency, TTFT, inter-token latency, tokens/s, requests/s, running vs waiting requests, KV-cache usage, and GPU utilisation, memory, temperature and power. I verified the dashboard loaded into Grafana and that each panel's query returned data after a load run; I did not capture screenshots.
@@ -184,7 +203,7 @@ Note: the Makefile targets were written from the commands I ran by hand; I could
 
 ## What I did not do
 
-- **Stretch goals C and D** (GPU time-slicing, MCP server with tool calling) are **not done**. Goal A (cache) was measured only in Docker, and goal B (scale-to-zero) only by manual `kubectl scale`, without KEDA or Knative.
+- **Stretch goal D** (MCP server with tool calling) is not described here yet. Goal A (cache) was measured only in Docker, and goal B (scale-to-zero) only by manual `kubectl scale`, without KEDA or Knative.
 - I did not diagnose why pods could not download from Hugging Face ([`docs/pod-network-download-issue.md`](docs/pod-network-download-issue.md)). The weights were copied from the Docker volume into the PVC and vLLM runs with `HF_HUB_OFFLINE=1`, so a network cold start in the cluster was never measured.
 - I did not investigate Ollama's concurrency behaviour or tune it.
 - I did not compare the same quantisation format across engines, or measure output quality.

@@ -162,3 +162,12 @@ Times are local to the WSL2 environment (`2026-10-29`, Europe/London).
 - Problem: the first cold attempt (volume `lab-cold-empty-cache`) was lost. A transient WSL vsock error (`accept4 failed 110`) made one `docker.exe ps` call fail; the script treated that as "container exited" and its trap stopped the container just before the first completion (about 40 min in, judging from log timestamps: weights loaded 17:36 UTC). Script changed to require 5 consecutive "not running" answers; cold run repeated. No figure from the lost run is reported as a result.
 - No in-cluster empty-cache measurement exists (pods could not download weights; see `docs/pod-network-download-issue.md`). KEDA/Knative not tried; scaling was manual.
 - Left on the machine (not deleted, awaiting user decision): Docker volumes `lab-cold-empty-cache` and `lab-cold-empty-cache-2` (~5.2 GB each). The cluster Deployment is currently scaled to 0.
+
+## 2026-10-29 — Stretch C: GPU time-slicing
+
+- Device plugin reconfigured via `k8s/sharing/device-plugin-timeslicing-values.yaml` (`sharing.timeSlicing` replicas 2); node then advertised `nvidia.com/gpu: 2`. Quota override `k8s/sharing/quota-override.yaml` (2 GPUs).
+- Problem 1: pod A at `--gpu-memory-utilization=0.42` crashed (KV cache 0.15 GiB < 0.22 GiB needed for 4,096 tokens). 0.45 started fine for A alone.
+- Problem 2: pod B at 0.45 failed with "Available KV cache memory: -6.15 GiB": vLLM 0.32.0 counts the other pod's GPU memory against its own budget. Switched both pods to `--kv-cache-memory-bytes=1073741824` (flag verified with `vllm serve --help=all`).
+- Mistake and fix: my `kubectl delete deploy vllm-b` omitted `-n llm-inference` (NotFound), so the crash-looping B kept loading weights on the GPU while I ran the "A alone" baseline (nvidia-smi showed 13.5 GiB instead of A's ~7.7 GiB). That baseline and an earlier 0.45-config baseline were discarded (uncommitted, my own files) and re-run with B scaled to 0; nvidia-smi then showed 7,713 MiB.
+- Results (`results/sharing/`): A alone c=1: TTFT p50 0.013 s, 153.1 tok/s, e2e p50 0.431 s; with B also loaded, c=1: 71.7 tok/s, e2e p50 0.912 s (A) and 71.5 tok/s, 0.918 s (B); c=4: 72.8 / 71.2 tok/s, e2e p50 0.928 / 0.946 s. 0 failures. Inside both pods `nvidia-smi` showed 16,303 MiB total and 14,638 MiB used (no isolation).
+- Reverted afterwards: test Deployments/Services deleted, plugin helm-upgraded with `--reset-values --set runtimeClassName=nvidia` (allocatable back to 1), original quota re-applied, main `vllm` scaled back to 1.
