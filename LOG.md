@@ -133,3 +133,13 @@ Times are local to the WSL2 environment (`2026-10-29`, Europe/London).
 - Device plugin: the plugin docs page showed chart 0.17.1, but `helm search repo` listed 0.20.1 as latest; installed `nvdp/nvidia-device-plugin` 0.20.1 in namespace `nvidia-device-plugin` with `--set runtimeClassName=nvidia`.
 - Problem: the DaemonSet scheduled 0 pods, because its node affinity requires NFD/GFD labels (`feature.node.kubernetes.io/pci-10de.present`, etc.) and this cluster has no NFD. Fix: manually labelled the node `nvidia.com/gpu.present=true`. The plugin then started, logged "Detected platform: wsl", registered `nvidia.com/gpu`, and the node reported allocatable `nvidia.com/gpu: 1`.
 - Verification: `k8s/tests/gpu-smoke.yaml` (runtimeClassName nvidia, limit nvidia.com/gpu: 1) ran `nvidia-smi` and listed the RTX 5070 Ti, 16,303 MiB, driver 610.57.01. Pod deleted afterwards.
+
+## 2026-10-29 — Phase 2 step 2: vLLM on k3s, in-cluster benchmark
+
+- Manifests in `k8s/vllm/`: namespace `llm-inference` + ResourceQuota (1 GPU, 8 CPU, 12 Gi mem, 60 Gi storage), 30 Gi PVC `hf-cache` (local-path), Deployment (Recreate, `runtimeClassName: nvidia`, same vLLM args as Phase 1, startup/readiness/liveness on `/health`), ClusterIP Service. Quota enforcement visible via `kubectl describe resourcequota`.
+- Problem 1: Service named `vllm` injected `VLLM_PORT=tcp://...` service-link variables (vLLM warned about unknown `VLLM_*` vars). Set `enableServiceLinks: false` preventively; whether it would have caused a failure was not tested.
+- Problem 2: the pod could not finish Hugging Face downloads (xet `CAS Client Error`, then with `HF_HUB_DISABLE_XET=1` `Connection reset by peer`); 3 container restarts, PVC held 13 MB after ~30 min. Root cause not diagnosed (see `docs/pod-network-download-issue.md`). Workaround: copied the 5.2 GB Phase 1 cache from the Docker volume into the PVC via a temporary pod (the partial 13 MB download was deleted first), and set `HF_HUB_OFFLINE=1`.
+- With the cache in place the pod became Ready; engine init took 92.72 s (compilation 11.31 s), KV cache 116,016 tokens, identical to the Docker run (93.56 s).
+- Benchmark: `kubectl port-forward svc/vllm 8001:8000`, same harness and prompts, output `results/k8s/vllm_20261029T154626.064016Z.{json,csv}`; 0 failures.
+  - TTFT p50 0.020 / 0.027 / 0.034 / 0.049 s; e2e p50 0.447 / 0.444 / 0.454 / 0.473 s; tokens/s p50 149.4 / 151.6 / 151.6 / 150.6 at concurrency 1/2/4/8; peak VRAM 13,588 MiB (whole GPU).
+  - Compared with Docker (TTFT p50 0.016-0.035 s, tokens/s 146.5-149.7): similar. Differences are small and include the port-forward hop and run-to-run noise; only one run of each was made, so no claim is made about which is faster.
