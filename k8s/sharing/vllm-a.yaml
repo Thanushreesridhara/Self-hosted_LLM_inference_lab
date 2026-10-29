@@ -1,0 +1,93 @@
+# GPU-sharing experiment (time-slicing). Needs k8s/sharing/device-plugin-timeslicing-values.yaml
+# and quota-override.yaml. Fixed 1 GiB KV cache (--kv-cache-memory-bytes): a second vLLM instance cannot use
+# --gpu-memory-utilization here because vLLM counts the other pod's GPU memory against its budget.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-a
+  namespace: llm-inference
+  labels:
+    app: vllm-a
+spec:
+  replicas: 1
+  # One GPU: the old pod must release it before the new one starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vllm-a
+  template:
+    metadata:
+      labels:
+        app: vllm-a
+    spec:
+      runtimeClassName: nvidia
+      # The Service is named "vllm", so service links would inject VLLM_PORT=tcp://...,
+      # which collides with vLLM's own VLLM_PORT setting.
+      enableServiceLinks: false
+      containers:
+        - name: vllm-a
+          image: vllm/vllm-openai@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34
+          args:
+            - --model=Qwen/Qwen2.5-7B-Instruct-AWQ
+            - --served-model-name=qwen2.5-7b-awq
+            - --quantization=awq
+            - --max-model-len=4096
+            - --kv-cache-memory-bytes=1073741824
+            - --max-num-seqs=8
+          env:
+            # Pods in this k3s-on-WSL2 cluster could not complete Hugging Face downloads
+            # (connection resets, even with xet disabled). Weights are pre-loaded into the
+            # PVC (see docs/pod-network-download-issue.md), so run offline.
+            - name: HF_HUB_OFFLINE
+              value: "1"
+          ports:
+            - name: http
+              containerPort: 8000
+          resources:
+            requests:
+              cpu: "2"
+              memory: 4Gi
+            limits:
+              memory: 8Gi
+              nvidia.com/gpu: 1
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /root/.cache/huggingface
+            - name: shm
+              mountPath: /dev/shm
+          # First start downloads weights and compiles; allow up to 30 min.
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            failureThreshold: 180
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 30
+            failureThreshold: 5
+      volumes:
+        - name: hf-cache
+          persistentVolumeClaim:
+            claimName: hf-cache
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-a
+  namespace: llm-inference
+  labels:
+    app: vllm-a
+spec:
+  selector:
+    app: vllm-a
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

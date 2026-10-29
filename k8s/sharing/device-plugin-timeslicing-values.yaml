@@ -1,0 +1,15 @@
+# Advertise the single physical GPU as 2 schedulable nvidia.com/gpu units (time-slicing).
+# This does NOT isolate memory or enforce fair compute shares between the pods.
+runtimeClassName: nvidia
+config:
+  default: default
+  map:
+    default: |-
+      version: v1
+      flags:
+        migStrategy: none
+      sharing:
+        timeSlicing:
+          resources:
+            - name: nvidia.com/gpu
+              replicas: 2

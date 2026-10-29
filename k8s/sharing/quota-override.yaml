@@ -1,0 +1,15 @@
+# Replaces the quota from k8s/vllm/00-namespace.yaml for the time-slicing experiment
+# (2 GPU units, more memory for two pods). Re-apply 00-namespace.yaml to revert.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: llm-inference-quota
+  namespace: llm-inference
+spec:
+  hard:
+    requests.nvidia.com/gpu: "2"
+    requests.cpu: "8"
+    requests.memory: 12Gi
+    limits.memory: 16Gi
+    persistentvolumeclaims: "2"
+    requests.storage: 60Gi
