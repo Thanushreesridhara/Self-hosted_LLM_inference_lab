@@ -33,9 +33,10 @@ spec:
             - --gpu-memory-utilization=0.80
             - --max-num-seqs=8
           env:
-            # xet downloads failed repeatedly from the pod network ("CAS Client Error ...
-            # error decoding response body"); fall back to plain HTTPS downloads.
-            - name: HF_HUB_DISABLE_XET
+            # Pods in this k3s-on-WSL2 cluster could not complete Hugging Face downloads
+            # (connection resets, even with xet disabled). Weights are pre-loaded into the
+            # PVC (see docs/pod-network-download-issue.md), so run offline.
+            - name: HF_HUB_OFFLINE
               value: "1"
           ports:
             - name: http
