@@ -32,6 +32,9 @@ spec:
             - --max-model-len=4096
             - --gpu-memory-utilization=0.80
             - --max-num-seqs=8
+            # Tool calling (used by mcp/agent.py); Qwen2.5 emits Hermes-style tool calls.
+            - --enable-auto-tool-choice
+            - --tool-call-parser=hermes
           env:
             # Pods in this k3s-on-WSL2 cluster could not complete Hugging Face downloads
             # (connection resets, even with xet disabled). Weights are pre-loaded into the
