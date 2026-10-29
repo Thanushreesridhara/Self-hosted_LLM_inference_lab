@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llm-inference
+  labels:
+    app.kubernetes.io/part-of: llm-inference-lab
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: llm-inference-quota
+  namespace: llm-inference
+spec:
+  hard:
+    requests.nvidia.com/gpu: "1"
+    requests.cpu: "8"
+    requests.memory: 12Gi
+    limits.memory: 12Gi
+    persistentvolumeclaims: "2"
+    requests.storage: 60Gi
