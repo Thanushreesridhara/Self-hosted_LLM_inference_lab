@@ -32,6 +32,11 @@ spec:
             - --max-model-len=4096
             - --gpu-memory-utilization=0.80
             - --max-num-seqs=8
+          env:
+            # xet downloads failed repeatedly from the pod network ("CAS Client Error ...
+            # error decoding response body"); fall back to plain HTTPS downloads.
+            - name: HF_HUB_DISABLE_XET
+              value: "1"
           ports:
             - name: http
               containerPort: 8000
