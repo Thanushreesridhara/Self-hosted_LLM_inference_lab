@@ -1,0 +1,7 @@
+{"ts": 1793310577.4866195, "tool": "vllm_scrape_up", "window_minutes": 5, "query": "min(up{namespace=\"llm-inference\",job=\"vllm\"})", "value": 1.0, "series": 1}
+{"ts": 1793310577.6131713, "tool": "p95_latency_seconds", "window_minutes": 5, "query": "histogram_quantile(0.95, sum by (le) (rate(vllm:e2e_request_latency_seconds_bucket{namespace=\"llm-inference\"}[5m])))", "value": 0.49197916666666663, "series": 1}
+{"ts": 1793310577.626231, "tool": "p95_ttft_seconds", "window_minutes": 5, "query": "histogram_quantile(0.95, sum by (le) (rate(vllm:time_to_first_token_seconds_bucket{namespace=\"llm-inference\"}[5m])))", "value": 0.049, "series": 1}
+{"ts": 1793310577.6403205, "tool": "error_rate", "window_minutes": 5, "query": "sum(rate(vllm:request_success_total{namespace=\"llm-inference\",finished_reason=~\"abort|error\"}[5m])) / sum(rate(vllm:request_success_total{namespace=\"llm-inference\"}[5m]))", "value": 0.0, "series": 1}
+{"ts": 1793310577.6536462, "tool": "requests_running", "window_minutes": 5, "query": "sum(vllm:num_requests_running{namespace=\"llm-inference\"})", "value": 0.0, "series": 1}
+{"ts": 1793310577.6659918, "tool": "requests_waiting", "window_minutes": 5, "query": "sum(vllm:num_requests_waiting{namespace=\"llm-inference\"})", "value": 0.0, "series": 1}
+{"ts": 1793310577.6777687, "tool": "kv_cache_usage_ratio", "window_minutes": 5, "query": "max(vllm:kv_cache_usage_perc{namespace=\"llm-inference\"})", "value": 0.0, "series": 1}
