@@ -1,0 +1,26 @@
+# Local credentials and cluster configuration
+.env
+.env.*
+!.env.example
+*.kubeconfig
+kubeconfig
+secrets/
+
+# Python
+__pycache__/
+.pytest_cache/
+.venv*/
+venv/
+*.py[cod]
+
+# Local model and container caches
+.cache/
+models/
+*.safetensors
+*.gguf
+*.bin
+
+# Editor and OS noise
+.vscode/
+.DS_Store
+Thumbs.db
