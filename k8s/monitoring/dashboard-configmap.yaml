@@ -1,0 +1,177 @@
+apiVersion: v1
+data:
+  llm-inference.json: "{\n  \"uid\": \"llm-inference-lab\",\n  \"title\": \"LLM inference\
+    \ (vLLM + GPU)\",\n  \"tags\": [\n    \"llm\",\n    \"vllm\",\n    \"gpu\"\n \
+    \ ],\n  \"schemaVersion\": 39,\n  \"version\": 1,\n  \"editable\": true,\n  \"\
+    time\": {\n    \"from\": \"now-30m\",\n    \"to\": \"now\"\n  },\n  \"refresh\"\
+    : \"10s\",\n  \"panels\": [\n    {\n      \"id\": 1,\n      \"type\": \"timeseries\"\
+    ,\n      \"title\": \"E2E request latency (p50 / p95)\",\n      \"description\"\
+    : \"vllm:e2e_request_latency_seconds histogram\",\n      \"datasource\": {\n \
+    \       \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n\
+    \      \"gridPos\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"w\": 8,\n\
+    \        \"h\": 8\n      },\n      \"targets\": [\n        {\n          \"refId\"\
+    : \"A\",\n          \"expr\": \"histogram_quantile(0.5, sum by (le) (rate(vllm:e2e_request_latency_seconds_bucket{namespace=\\\
+    \"llm-inference\\\"}[1m])))\",\n          \"legendFormat\": \"p50\",\n       \
+    \   \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\"\
+    : \"prometheus\"\n          }\n        },\n        {\n          \"refId\": \"\
+    B\",\n          \"expr\": \"histogram_quantile(0.95, sum by (le) (rate(vllm:e2e_request_latency_seconds_bucket{namespace=\\\
+    \"llm-inference\\\"}[1m])))\",\n          \"legendFormat\": \"p95\",\n       \
+    \   \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\"\
+    : \"prometheus\"\n          }\n        }\n      ],\n      \"fieldConfig\": {\n\
+    \        \"defaults\": {\n          \"unit\": \"s\"\n        },\n        \"overrides\"\
+    : []\n      },\n      \"options\": {\n        \"legend\": {\n          \"displayMode\"\
+    : \"list\",\n          \"placement\": \"bottom\"\n        },\n        \"tooltip\"\
+    : {\n          \"mode\": \"multi\"\n        }\n      }\n    },\n    {\n      \"\
+    id\": 2,\n      \"type\": \"timeseries\",\n      \"title\": \"Time to first token\
+    \ (p50 / p95)\",\n      \"description\": \"\",\n      \"datasource\": {\n    \
+    \    \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n  \
+    \    \"gridPos\": {\n        \"x\": 8,\n        \"y\": 0,\n        \"w\": 8,\n\
+    \        \"h\": 8\n      },\n      \"targets\": [\n        {\n          \"refId\"\
+    : \"A\",\n          \"expr\": \"histogram_quantile(0.5, sum by (le) (rate(vllm:time_to_first_token_seconds_bucket{namespace=\\\
+    \"llm-inference\\\"}[1m])))\",\n          \"legendFormat\": \"p50\",\n       \
+    \   \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\"\
+    : \"prometheus\"\n          }\n        },\n        {\n          \"refId\": \"\
+    B\",\n          \"expr\": \"histogram_quantile(0.95, sum by (le) (rate(vllm:time_to_first_token_seconds_bucket{namespace=\\\
+    \"llm-inference\\\"}[1m])))\",\n          \"legendFormat\": \"p95\",\n       \
+    \   \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\"\
+    : \"prometheus\"\n          }\n        }\n      ],\n      \"fieldConfig\": {\n\
+    \        \"defaults\": {\n          \"unit\": \"s\"\n        },\n        \"overrides\"\
+    : []\n      },\n      \"options\": {\n        \"legend\": {\n          \"displayMode\"\
+    : \"list\",\n          \"placement\": \"bottom\"\n        },\n        \"tooltip\"\
+    : {\n          \"mode\": \"multi\"\n        }\n      }\n    },\n    {\n      \"\
+    id\": 3,\n      \"type\": \"timeseries\",\n      \"title\": \"Inter-token latency\
+    \ (p50 / p95)\",\n      \"description\": \"\",\n      \"datasource\": {\n    \
+    \    \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n  \
+    \    \"gridPos\": {\n        \"x\": 16,\n        \"y\": 0,\n        \"w\": 8,\n\
+    \        \"h\": 8\n      },\n      \"targets\": [\n        {\n          \"refId\"\
+    : \"A\",\n          \"expr\": \"histogram_quantile(0.5, sum by (le) (rate(vllm:inter_token_latency_seconds_bucket{namespace=\\\
+    \"llm-inference\\\"}[1m])))\",\n          \"legendFormat\": \"p50\",\n       \
+    \   \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\"\
+    : \"prometheus\"\n          }\n        },\n        {\n          \"refId\": \"\
+    B\",\n          \"expr\": \"histogram_quantile(0.95, sum by (le) (rate(vllm:inter_token_latency_seconds_bucket{namespace=\\\
+    \"llm-inference\\\"}[1m])))\",\n          \"legendFormat\": \"p95\",\n       \
+    \   \"datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\"\
+    : \"prometheus\"\n          }\n        }\n      ],\n      \"fieldConfig\": {\n\
+    \        \"defaults\": {\n          \"unit\": \"s\"\n        },\n        \"overrides\"\
+    : []\n      },\n      \"options\": {\n        \"legend\": {\n          \"displayMode\"\
+    : \"list\",\n          \"placement\": \"bottom\"\n        },\n        \"tooltip\"\
+    : {\n          \"mode\": \"multi\"\n        }\n      }\n    },\n    {\n      \"\
+    id\": 4,\n      \"type\": \"timeseries\",\n      \"title\": \"Throughput: generated\
+    \ tokens/s\",\n      \"description\": \"\",\n      \"datasource\": {\n       \
+    \ \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n     \
+    \ \"gridPos\": {\n        \"x\": 0,\n        \"y\": 8,\n        \"w\": 8,\n  \
+    \      \"h\": 8\n      },\n      \"targets\": [\n        {\n          \"refId\"\
+    : \"A\",\n          \"expr\": \"sum(rate(vllm:generation_tokens_total{namespace=\\\
+    \"llm-inference\\\"}[1m]))\",\n          \"legendFormat\": \"tokens/s\",\n   \
+    \       \"datasource\": {\n            \"type\": \"prometheus\",\n           \
+    \ \"uid\": \"prometheus\"\n          }\n        }\n      ],\n      \"fieldConfig\"\
+    : {\n        \"defaults\": {\n          \"unit\": \"short\"\n        },\n    \
+    \    \"overrides\": []\n      },\n      \"options\": {\n        \"legend\": {\n\
+    \          \"displayMode\": \"list\",\n          \"placement\": \"bottom\"\n \
+    \       },\n        \"tooltip\": {\n          \"mode\": \"multi\"\n        }\n\
+    \      }\n    },\n    {\n      \"id\": 5,\n      \"type\": \"timeseries\",\n \
+    \     \"title\": \"Completed requests/s\",\n      \"description\": \"\",\n   \
+    \   \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"\
+    prometheus\"\n      },\n      \"gridPos\": {\n        \"x\": 8,\n        \"y\"\
+    : 8,\n        \"w\": 8,\n        \"h\": 8\n      },\n      \"targets\": [\n  \
+    \      {\n          \"refId\": \"A\",\n          \"expr\": \"sum by (finished_reason)\
+    \ (rate(vllm:request_success_total{namespace=\\\"llm-inference\\\"}[1m]))\",\n\
+    \          \"legendFormat\": \"{{finished_reason}}\",\n          \"datasource\"\
+    : {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          }\n        }\n      ],\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"unit\": \"reqps\"\n        },\n        \"overrides\": []\n  \
+    \    },\n      \"options\": {\n        \"legend\": {\n          \"displayMode\"\
+    : \"list\",\n          \"placement\": \"bottom\"\n        },\n        \"tooltip\"\
+    : {\n          \"mode\": \"multi\"\n        }\n      }\n    },\n    {\n      \"\
+    id\": 6,\n      \"type\": \"timeseries\",\n      \"title\": \"Running vs waiting\
+    \ requests\",\n      \"description\": \"\",\n      \"datasource\": {\n       \
+    \ \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n     \
+    \ \"gridPos\": {\n        \"x\": 16,\n        \"y\": 8,\n        \"w\": 8,\n \
+    \       \"h\": 8\n      },\n      \"targets\": [\n        {\n          \"refId\"\
+    : \"A\",\n          \"expr\": \"sum(vllm:num_requests_running{namespace=\\\"llm-inference\\\
+    \"})\",\n          \"legendFormat\": \"running\",\n          \"datasource\": {\n\
+    \            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n\
+    \          }\n        },\n        {\n          \"refId\": \"B\",\n          \"\
+    expr\": \"sum(vllm:num_requests_waiting{namespace=\\\"llm-inference\\\"})\",\n\
+    \          \"legendFormat\": \"waiting (queued)\",\n          \"datasource\":\
+    \ {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          }\n        }\n      ],\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"unit\": \"short\"\n        },\n        \"overrides\": []\n  \
+    \    },\n      \"options\": {\n        \"legend\": {\n          \"displayMode\"\
+    : \"list\",\n          \"placement\": \"bottom\"\n        },\n        \"tooltip\"\
+    : {\n          \"mode\": \"multi\"\n        }\n      }\n    },\n    {\n      \"\
+    id\": 7,\n      \"type\": \"timeseries\",\n      \"title\": \"KV cache usage\"\
+    ,\n      \"description\": \"\",\n      \"datasource\": {\n        \"type\": \"\
+    prometheus\",\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n\
+    \        \"x\": 0,\n        \"y\": 16,\n        \"w\": 8,\n        \"h\": 8\n\
+    \      },\n      \"targets\": [\n        {\n          \"refId\": \"A\",\n    \
+    \      \"expr\": \"max(vllm:kv_cache_usage_perc{namespace=\\\"llm-inference\\\"\
+    })\",\n          \"legendFormat\": \"kv cache\",\n          \"datasource\": {\n\
+    \            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n\
+    \          }\n        }\n      ],\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"unit\": \"percentunit\"\n        },\n        \"overrides\": []\n\
+    \      },\n      \"options\": {\n        \"legend\": {\n          \"displayMode\"\
+    : \"list\",\n          \"placement\": \"bottom\"\n        },\n        \"tooltip\"\
+    : {\n          \"mode\": \"multi\"\n        }\n      }\n    },\n    {\n      \"\
+    id\": 8,\n      \"type\": \"timeseries\",\n      \"title\": \"GPU utilisation\"\
+    ,\n      \"description\": \"DCGM_FI_DEV_GPU_UTIL\",\n      \"datasource\": {\n\
+    \        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n\
+    \      \"gridPos\": {\n        \"x\": 8,\n        \"y\": 16,\n        \"w\": 8,\n\
+    \        \"h\": 8\n      },\n      \"targets\": [\n        {\n          \"refId\"\
+    : \"A\",\n          \"expr\": \"DCGM_FI_DEV_GPU_UTIL\",\n          \"legendFormat\"\
+    : \"GPU {{gpu}} util %\",\n          \"datasource\": {\n            \"type\":\
+    \ \"prometheus\",\n            \"uid\": \"prometheus\"\n          }\n        }\n\
+    \      ],\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"unit\"\
+    : \"percent\"\n        },\n        \"overrides\": []\n      },\n      \"options\"\
+    : {\n        \"legend\": {\n          \"displayMode\": \"list\",\n          \"\
+    placement\": \"bottom\"\n        },\n        \"tooltip\": {\n          \"mode\"\
+    : \"multi\"\n        }\n      }\n    },\n    {\n      \"id\": 9,\n      \"type\"\
+    : \"timeseries\",\n      \"title\": \"GPU memory (framebuffer)\",\n      \"description\"\
+    : \"\",\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"\
+    uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"x\": 16,\n  \
+    \      \"y\": 16,\n        \"w\": 8,\n        \"h\": 8\n      },\n      \"targets\"\
+    : [\n        {\n          \"refId\": \"A\",\n          \"expr\": \"DCGM_FI_DEV_FB_USED\"\
+    ,\n          \"legendFormat\": \"used MiB\",\n          \"datasource\": {\n  \
+    \          \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n  \
+    \        }\n        },\n        {\n          \"refId\": \"B\",\n          \"expr\"\
+    : \"DCGM_FI_DEV_FB_FREE\",\n          \"legendFormat\": \"free MiB\",\n      \
+    \    \"datasource\": {\n            \"type\": \"prometheus\",\n            \"\
+    uid\": \"prometheus\"\n          }\n        }\n      ],\n      \"fieldConfig\"\
+    : {\n        \"defaults\": {\n          \"unit\": \"decmbytes\"\n        },\n\
+    \        \"overrides\": []\n      },\n      \"options\": {\n        \"legend\"\
+    : {\n          \"displayMode\": \"list\",\n          \"placement\": \"bottom\"\
+    \n        },\n        \"tooltip\": {\n          \"mode\": \"multi\"\n        }\n\
+    \      }\n    },\n    {\n      \"id\": 10,\n      \"type\": \"timeseries\",\n\
+    \      \"title\": \"GPU temperature\",\n      \"description\": \"\",\n      \"\
+    datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\
+    \n      },\n      \"gridPos\": {\n        \"x\": 0,\n        \"y\": 24,\n    \
+    \    \"w\": 8,\n        \"h\": 8\n      },\n      \"targets\": [\n        {\n\
+    \          \"refId\": \"A\",\n          \"expr\": \"DCGM_FI_DEV_GPU_TEMP\",\n\
+    \          \"legendFormat\": \"GPU {{gpu}} \\u00b0C\",\n          \"datasource\"\
+    : {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
+    \n          }\n        }\n      ],\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"unit\": \"celsius\"\n        },\n        \"overrides\": []\n\
+    \      },\n      \"options\": {\n        \"legend\": {\n          \"displayMode\"\
+    : \"list\",\n          \"placement\": \"bottom\"\n        },\n        \"tooltip\"\
+    : {\n          \"mode\": \"multi\"\n        }\n      }\n    },\n    {\n      \"\
+    id\": 11,\n      \"type\": \"timeseries\",\n      \"title\": \"GPU power\",\n\
+    \      \"description\": \"\",\n      \"datasource\": {\n        \"type\": \"prometheus\"\
+    ,\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\": {\n        \"\
+    x\": 8,\n        \"y\": 24,\n        \"w\": 8,\n        \"h\": 8\n      },\n \
+    \     \"targets\": [\n        {\n          \"refId\": \"A\",\n          \"expr\"\
+    : \"DCGM_FI_DEV_POWER_USAGE\",\n          \"legendFormat\": \"GPU {{gpu}} W\"\
+    ,\n          \"datasource\": {\n            \"type\": \"prometheus\",\n      \
+    \      \"uid\": \"prometheus\"\n          }\n        }\n      ],\n      \"fieldConfig\"\
+    : {\n        \"defaults\": {\n          \"unit\": \"watt\"\n        },\n     \
+    \   \"overrides\": []\n      },\n      \"options\": {\n        \"legend\": {\n\
+    \          \"displayMode\": \"list\",\n          \"placement\": \"bottom\"\n \
+    \       },\n        \"tooltip\": {\n          \"mode\": \"multi\"\n        }\n\
+    \      }\n    }\n  ],\n  \"templating\": {\n    \"list\": []\n  },\n  \"annotations\"\
+    : {\n    \"list\": []\n  }\n}"
+kind: ConfigMap
+metadata:
+  name: llm-inference-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: '1'
+
