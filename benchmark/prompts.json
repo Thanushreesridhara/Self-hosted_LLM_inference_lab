@@ -1,0 +1,34 @@
+[
+  {
+    "id": "platform-explain",
+    "text": "In two sentences, explain what a Kubernetes Service does."
+  },
+  {
+    "id": "platform-debug",
+    "text": "A pod is Pending because no node has enough memory. Name two checks an operator should make."
+  },
+  {
+    "id": "platform-observability",
+    "text": "Give three useful Prometheus metrics for monitoring an LLM inference API."
+  },
+  {
+    "id": "platform-security",
+    "text": "Name two controls that help isolate workloads belonging to different platform tenants."
+  },
+  {
+    "id": "platform-gpu",
+    "text": "Why can GPU memory pressure prevent a model server from accepting another request?"
+  },
+  {
+    "id": "platform-deploy",
+    "text": "What is the difference between a Kubernetes Deployment and a Service?"
+  },
+  {
+    "id": "platform-capacity",
+    "text": "An inference queue is growing while GPU utilization is high. Give two capacity-related hypotheses."
+  },
+  {
+    "id": "platform-reliability",
+    "text": "Suggest two safe first checks when an inference endpoint starts returning errors."
+  }
+]
