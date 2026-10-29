@@ -1,0 +1,12 @@
+# Model-weights cache (Hugging Face hub cache). Survives pod restarts and
+# scale-to-zero so weights are downloaded once.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hf-cache
+  namespace: llm-inference
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 30Gi
