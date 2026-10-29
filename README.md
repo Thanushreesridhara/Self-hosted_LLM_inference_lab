@@ -10,11 +10,13 @@ This is a learning/portfolio project for AI-infrastructure platform engineering.
 |---|---|
 | `docker/compose.yaml`, `scripts/start-runtime.sh` | Digest-pinned Ollama and vLLM services; the script runs one engine at a time on the GPU |
 | `benchmark/` | Python benchmark client (OpenAI-compatible streaming API) and pytest tests for parsing and statistics |
-| `results/` | Raw CSV/JSON output of every benchmark run (`results/k8s/` for in-cluster) |
+| `results/` | Raw output of every run: benchmarks (`k8s/` in-cluster), `startup/`, `sharing/`, `mcp/` |
 | `k8s/vllm/` | Namespace + ResourceQuota, model-cache PVC, vLLM Deployment, Service |
 | `k8s/monitoring/` | Helm values for kube-prometheus-stack and the DCGM exporter, vLLM ServiceMonitor, dashboard ConfigMap |
 | `dashboards/` | Grafana dashboard JSON (11 panels) |
 | `scripts/setup-k3s-wsl.sh` | Host setup (NVIDIA container toolkit, k3s, Helm); needs sudo, read before running |
+| `k8s/sharing/` | GPU time-slicing experiment (device-plugin config, two vLLM pods, quota override) |
+| `mcp/` | Read-only Prometheus MCP server, tool-calling agent, tests |
 | `docs/` | Write-up of problems worth knowing about |
 | `.github/workflows/ci.yaml`, `Makefile` | CI (yamllint, pytest, kubeconform, helm lint) and reproduction targets |
 | `LOG.md` | Chronological lab notebook |
@@ -154,6 +156,19 @@ The NVIDIA device plugin was reconfigured to advertise the one GPU as 2 `nvidia.
 - **Time-slicing does not isolate memory.** From inside either pod, `nvidia-smi` showed the full 16,303 MiB GPU and the combined 14,638 MiB in use. Nothing limits one pod's memory use, so a misbehaving pod could exhaust memory for both. Time-slicing also does not guarantee a fair compute share.
 - Two vLLM instances could not be started with `--gpu-memory-utilization`: vLLM 0.32.0 counted the first pod's GPU memory against the second pod's budget and computed a negative KV-cache size (-6.15 GiB). Both pods therefore use a fixed `--kv-cache-memory-bytes=1073741824` (1 GiB). A first attempt at a 0.42 fraction also failed (too little KV cache for a 4,096-token sequence).
 - The plugin and quota were reverted to the single-GPU configuration after the experiment.
+
+### MCP: read-only operations tools for the model
+
+[`mcp/server.py`](mcp/server.py) is a small MCP server (official Python SDK 2.3.0, stdio) exposing 8 read-only tools backed by **fixed** Prometheus queries: p95 latency, p95 time to first token, error rate, GPU utilisation / memory / temperature, queue state (running, waiting, KV-cache usage) and scrape status. No tool takes PromQL or free text; the only parameter is an integer look-back window (1 to 60 min). The server makes HTTP GETs to Prometheus's query API and nothing else (no shell, no file access, no writes), and appends every call to a JSONL log. [`mcp/agent.py`](mcp/agent.py) connects to the server as an MCP client, offers those tools to the vLLM-served Qwen2.5 model (vLLM started with `--enable-auto-tool-choice --tool-call-parser=hermes`), and asks "Is the inference service healthy, and why might it be slow?".
+
+One run against the live cluster during a benchmark load ([transcript](results/mcp/agent_transcript_20261029.txt), [tool-call log](results/mcp/tool_calls_20261029.jsonl)): the model made 5 tool calls (scrape status, p95 latency 0.492 s, p95 TTFT 0.049 s, error rate 0, queue state 0 running / 0 waiting) and answered that the service looked healthy.
+
+What this does and does not show:
+- The plumbing works end to end: tool discovery, model-issued tool calls, results fed back, a logged audit trail, and 7 unit tests for the query/parsing/validation code (`mcp/tests`, run in CI).
+- The model's *reasoning* was mediocre. It called a 49 ms p95 TTFT "relatively high" and described p95 latency as what "most requests" take. It also did not check the GPU tools. A 7B 4-bit model is a weak operations analyst, and this was one run, so no claim about reliability is made.
+- The queue gauges read 0 at the moment of the call even though a load run had been going; I did not investigate whether the load had already finished or the gauges are sampled between scrapes.
+- The server has no authentication or per-tenant scoping; it trusts whoever runs it, and the Prometheus URL is configuration.
+- Folder name: the `mcp/` directory shares its name with the SDK package. It worked here (scripts add only their own directory to the path and the folder has no `__init__.py`), but it is a naming hazard.
 
 ### Monitoring
 

@@ -171,3 +171,11 @@ Times are local to the WSL2 environment (`2026-10-29`, Europe/London).
 - Mistake and fix: my `kubectl delete deploy vllm-b` omitted `-n llm-inference` (NotFound), so the crash-looping B kept loading weights on the GPU while I ran the "A alone" baseline (nvidia-smi showed 13.5 GiB instead of A's ~7.7 GiB). That baseline and an earlier 0.45-config baseline were discarded (uncommitted, my own files) and re-run with B scaled to 0; nvidia-smi then showed 7,713 MiB.
 - Results (`results/sharing/`): A alone c=1: TTFT p50 0.013 s, 153.1 tok/s, e2e p50 0.431 s; with B also loaded, c=1: 71.7 tok/s, e2e p50 0.912 s (A) and 71.5 tok/s, 0.918 s (B); c=4: 72.8 / 71.2 tok/s, e2e p50 0.928 / 0.946 s. 0 failures. Inside both pods `nvidia-smi` showed 16,303 MiB total and 14,638 MiB used (no isolation).
 - Reverted afterwards: test Deployments/Services deleted, plugin helm-upgraded with `--reset-values --set runtimeClassName=nvidia` (allocatable back to 1), original quota re-applied, main `vllm` scaled back to 1.
+
+## 2026-10-29 — Stretch D: read-only MCP server + tool-calling agent
+
+- Checked the SDK first: `mcp` 2.3.0 has `MCPServer` / `Client` / `StdioServerParameters` (API differs from older docs); signatures inspected in a separate venv (`.venv-mcp`, ignored) rather than guessed.
+- `mcp/prom.py` (fixed queries, window validation 1-60, parsing, JSONL logging), `mcp/server.py` (8 tools, stdio), `mcp/agent.py` (MCP client -> OpenAI-style tools -> vLLM). 7 pytest tests; 14 tests pass together with the benchmark tests in one interpreter (checked because of the `mcp/` folder name).
+- vLLM tool flags verified via `vllm serve --help=all` (`--enable-auto-tool-choice`, `--tool-call-parser hermes` is a built-in choice) and added to `k8s/vllm/20-deployment.yaml`; pod restarted.
+- Run: port-forwards to vLLM and Prometheus, benchmark load at concurrency 8 in the background, then the agent. 7 tool calls logged (5 model-level calls; queue state issues 3 queries). p95 e2e 0.492 s, p95 TTFT 0.049 s, error rate 0, scrape up = 1, queue 0/0. Model answered "healthy". Its interpretation was weak (see README). Queue gauges reading 0 during load not investigated.
+- Artifacts: `results/mcp/agent_transcript_20261029.txt`, `results/mcp/tool_calls_20261029.jsonl`.
