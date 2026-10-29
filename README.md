@@ -119,6 +119,23 @@ What the data show on this machine and workload (short prompts, 64 output tokens
 
 vLLM in k3s gave similar numbers to Docker (TTFT p50 0.020 to 0.049 s vs 0.016 to 0.035 s; tokens/s p50 149 to 152 vs 146 to 150). The cluster run goes through `kubectl port-forward` and was run once, so I make no claim about which is faster.
 
+### Start-up time, scale-to-zero and the weight cache
+
+Measured with [`scripts/measure-k8s-startup.sh`](scripts/measure-k8s-startup.sh) and [`scripts/measure-docker-startup.sh`](scripts/measure-docker-startup.sh); raw data in [`results/startup/`](results/startup/). "Seconds" is wall-clock time from the scale-up (or `docker run`) until the first successful chat completion.
+
+| Case | Seconds |
+|---|---|
+| k3s, scale 0 to 1, weights already in PVC (3 runs) | 144.8, 134.6, 143.8 |
+| Docker, weights already in volume (1 run) | 138.1 |
+| Docker, empty volume: weights downloaded from Hugging Face (1 run) | 7302.2 |
+
+The empty-cache figure is almost entirely download time (5.2 GB), so it mostly measures this machine's network at that moment, not vLLM. It varied a lot: an earlier, aborted attempt (script bug, not reported as a result) had its weights loaded roughly 40 minutes after starting, judging from log timestamps. Treat the cold number as one observation, not a typical value. Both Docker figures exclude the image pull (image already present).
+
+- Scaling the Deployment to 0 took 3.4 to 7.9 s (pod gone). The pod became Ready within about 0.4 s of the first successful completion in every run.
+- With a warm cache, a cold pod therefore costs a little over 2 minutes before it can serve. The engine log shows about 93 s of that is vLLM's own initialisation (profiling, KV-cache allocation, warm-up), which a PVC cache does not remove; I did not separately time the remaining seconds (container start, weight load).
+- I did not try KEDA or Knative, so there is no request-driven scale-from-zero here: the scaling was done by hand with `kubectl scale`.
+- The empty-cache case could only be measured in Docker, because pods in this cluster could not download weights (see [`docs/pod-network-download-issue.md`](docs/pod-network-download-issue.md)). An in-cluster empty-cache number does not exist.
+
 ### Monitoring
 
 Prometheus scrapes vLLM's `/metrics` (a ServiceMonitor) and the DCGM exporter. The dashboard ([`dashboards/llm-inference.json`](dashboards/llm-inference.json)) has panels for e2e latency, TTFT, inter-token latency, tokens/s, requests/s, running vs waiting requests, KV-cache usage, and GPU utilisation, memory, temperature and power. I verified the dashboard loaded into Grafana and that each panel's query returned data after a load run; I did not capture screenshots.
@@ -167,7 +184,7 @@ Note: the Makefile targets were written from the commands I ran by hand; I could
 
 ## What I did not do
 
-- **Stretch goals A to D** (cold-start vs warm-cache measurement, scale-to-zero with KEDA/Knative, GPU time-slicing, MCP server with tool calling) are **not done**.
+- **Stretch goals C and D** (GPU time-slicing, MCP server with tool calling) are **not done**. Goal A (cache) was measured only in Docker, and goal B (scale-to-zero) only by manual `kubectl scale`, without KEDA or Knative.
 - I did not diagnose why pods could not download from Hugging Face ([`docs/pod-network-download-issue.md`](docs/pod-network-download-issue.md)). The weights were copied from the Docker volume into the PVC and vLLM runs with `HF_HUB_OFFLINE=1`, so a network cold start in the cluster was never measured.
 - I did not investigate Ollama's concurrency behaviour or tune it.
 - I did not compare the same quantisation format across engines, or measure output quality.
