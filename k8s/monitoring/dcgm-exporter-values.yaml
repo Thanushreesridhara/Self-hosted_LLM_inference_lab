@@ -1,0 +1,4 @@
+runtimeClassName: nvidia
+serviceMonitor:
+  enabled: true
+  interval: 15s
