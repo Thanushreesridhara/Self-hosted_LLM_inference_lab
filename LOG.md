@@ -153,3 +153,12 @@ Times are local to the WSL2 environment (`2026-10-29`, Europe/London).
 - Problem: the chart's default `scrapeTimeout: 25s` exceeds the 15 s interval; the prometheus-operator skipped the ServiceMonitor ("scrapeTimeout 25s greater than scrapeInterval"), so no GPU series existed. Fixed with `scrapeTimeout: 10s`; target went `up`.
 - Dashboard as code: `dashboards/llm-inference.json` (11 panels: e2e latency p50/p95, TTFT p50/p95, inter-token latency, tokens/s, requests/s, running vs waiting requests, KV-cache usage, GPU utilisation, GPU memory, GPU temperature, GPU power) and ConfigMap `k8s/monitoring/dashboard-configmap.yaml` (label `grafana_dashboard=1`). Grafana's sidecar loaded it (found via the Grafana search API, uid `llm-inference-lab`).
 - Verification: after a short load run, each vLLM panel query returned data from Prometheus (e.g. e2e p95 0.758 s over a 5 min window, generated-token rate non-zero). The GPU temperature query returned a series once the target was up. I did not visually inspect the rendered dashboard in a browser.
+
+## 2026-10-29 — Stretch A/B: weight cache and scale-to-zero
+
+- `scripts/measure-k8s-startup.sh 3`: scale vLLM Deployment 0 -> 1 with the weights already in the PVC, via the Service ClusterIP (reachable from the WSL host). Time to first successful chat completion: 144.8, 134.6, 143.8 s; pod Ready within ~0.4 s of that; scale-down to zero 7.9, 3.4, 3.4 s. Data: `results/startup/k8s_warm_pvc_20261029.csv`.
+- Docker, warm volume (`scripts/measure-docker-startup.sh`): 138.1 s (`docker_warm_20261029.csv`).
+- Docker, empty volume (`lab-cold-empty-cache-2`): 7302.2 s (about 2 h 2 min), almost all weight download (5.2 GB) (`docker_cold_20261029.csv`).
+- Problem: the first cold attempt (volume `lab-cold-empty-cache`) was lost. A transient WSL vsock error (`accept4 failed 110`) made one `docker.exe ps` call fail; the script treated that as "container exited" and its trap stopped the container just before the first completion (about 40 min in, judging from log timestamps: weights loaded 17:36 UTC). Script changed to require 5 consecutive "not running" answers; cold run repeated. No figure from the lost run is reported as a result.
+- No in-cluster empty-cache measurement exists (pods could not download weights; see `docs/pod-network-download-issue.md`). KEDA/Knative not tried; scaling was manual.
+- Left on the machine (not deleted, awaiting user decision): Docker volumes `lab-cold-empty-cache` and `lab-cold-empty-cache-2` (~5.2 GB each). The cluster Deployment is currently scaled to 0.
